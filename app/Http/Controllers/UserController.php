@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Notifications\VerifyEmailNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Config;
 
 class UserController extends Controller
 {
@@ -41,16 +44,18 @@ class UserController extends Controller
             'email_verified_at' => null,
         ]);
 
-        // Créer un token pour l'API (si vous utilisez Sanctum)
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Générer l'URL de vérification
+        $verificationUrl = $this->generateVerificationUrl($user);
 
-        // Retourner la réponse
+        // Envoyer l'email de vérification
+        $user->notify(new VerifyEmailNotification($verificationUrl));
+
+        // Retourner la réponse (sans token)
         return response()->json([
             'success' => true,
-            'message' => 'Utilisateur enregistré avec succès',
+            'message' => 'Utilisateur enregistré avec succès. Veuillez vérifier votre email pour activer votre compte.',
             'data' => [
-                'user' => $user,
-                'token' => $token
+                'user' => $user
             ]
         ], 201);
     }
@@ -85,6 +90,15 @@ class UserController extends Controller
                 'success' => false,
                 'message' => 'Ces informations d\'identification ne correspondent pas à nos enregistrements.'
             ], 401);
+        }
+
+        // Vérifier si l'email est vérifié
+        if (!$user->email_verified_at) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Veuillez vérifier votre adresse email avant de vous connecter.',
+                'requires_verification' => true
+            ], 403);
         }
 
         // Créer un nouveau token
@@ -132,5 +146,25 @@ class UserController extends Controller
                 'user' => $request->user()
             ]
         ]);
+    }
+
+    /**
+     * Génère une URL signée pour la vérification d'email.
+     *
+     * @param  \App\Models\User  $user
+     * @return string
+     */
+    protected function generateVerificationUrl($user)
+    {
+        $url = URL::temporarySignedRoute(
+            'verification.verify',
+            Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
+            [
+                'id' => $user->id,
+                'hash' => sha1($user->email)
+            ]
+        );
+
+        return $url;
     }
 }
