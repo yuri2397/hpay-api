@@ -117,8 +117,6 @@ class UserController extends Controller
 
         // Retourner la réponse
         return response()->json([
-            'success' => true,
-            'message' => 'Connexion réussie',
             'user' => $user,
             'token' => $token
         ]);
