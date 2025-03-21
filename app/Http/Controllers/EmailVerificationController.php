@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\VerifyEmail;
 
 class EmailVerificationController extends Controller
 {
@@ -36,72 +38,72 @@ class EmailVerificationController extends Controller
 
         $verificationUrl = $this->generateVerificationUrl($user);
 
-        // Vous pouvez envoyer l'email ici via une notification
-        // $user->notify(new VerifyEmailNotification($verificationUrl));
+        try {
+            // Envoi de l'email avec la classe Mail
+            Mail::to($user->email)->send(new VerifyEmail($user, $verificationUrl));
 
-        // Pour le moment, retournons simplement l'URL (à remplacer par un vrai envoi d'email)
-        return response()->json([
-            'success' => true,
-            'message' => 'Email de vérification envoyé.',
-            'verification_url' => $verificationUrl // À supprimer en production
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Email de vérification envoyé avec succès.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de l\'envoi de l\'email de vérification.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
      * Vérifie l'email de l'utilisateur avec le lien reçu.
+     * Affiche une page HTML avec le résultat.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
     public function verify(Request $request)
     {
+        // Vérifier si la signature est correcte
+        if (!$request->hasValidSignature()) {
+            return view('auth.email-verification-page', [
+                'success' => false,
+                'expired' => true
+            ]);
+        }
+
         $user = User::find($request->id);
 
         if (!$user) {
-            return response()->json([
+            return view('auth.email-verification-page', [
                 'success' => false,
-                'message' => 'Utilisateur non trouvé.'
-            ], 404);
+                'error_message' => 'Utilisateur non trouvé.'
+            ]);
         }
 
         // Si l'utilisateur a déjà vérifié son email
         if ($user->email_verified_at) {
-            return response()->json([
+            return view('auth.email-verification-page', [
                 'success' => false,
-                'message' => 'Cet email est déjà vérifié.'
-            ], 400);
+                'already_verified' => true
+            ]);
         }
 
         // Si le hash ne correspond pas
         if (!hash_equals(sha1($user->email), $request->hash)) {
-            return response()->json([
+            return view('auth.email-verification-page', [
                 'success' => false,
-                'message' => 'Lien de vérification invalide.'
-            ], 400);
-        }
-
-        // Si la signature est incorrecte
-        if (!$request->hasValidSignature()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Lien de vérification expiré ou invalide.'
-            ], 400);
+                'error_message' => 'Lien de vérification invalide.'
+            ]);
         }
 
         // Vérifier l'email
         $user->email_verified_at = now();
         $user->save();
 
-        // Créer un token pour l'authentification automatique après vérification
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Email vérifié avec succès.',
-            'data' => [
-                'user' => $user,
-                'token' => $token
-            ]
+        // Afficher la page de succès
+        return view('auth.email-verification-page', [
+            'success' => true
         ]);
     }
 
@@ -123,5 +125,15 @@ class EmailVerificationController extends Controller
         );
 
         return $url;
+    }
+
+    /**
+     * Affiche un formulaire pour demander un nouveau lien de vérification.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function showResendForm()
+    {
+        return view('auth.resend-verification');
     }
 }

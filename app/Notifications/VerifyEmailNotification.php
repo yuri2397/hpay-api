@@ -48,6 +48,7 @@ class VerifyEmailNotification extends Notification implements ShouldQueue
      */
     public function toMail($notifiable)
     {
+        throw new \Exception('Test exception');
         return (new MailMessage)
             ->subject('Veuillez vérifier votre adresse email')
             ->line('Merci de vous être inscrit! Veuillez cliquer sur le bouton ci-dessous pour vérifier votre adresse email.')

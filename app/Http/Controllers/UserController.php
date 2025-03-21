@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\VerifyEmail;
 use App\Models\User;
 use App\Notifications\VerifyEmailNotification;
 use Illuminate\Http\Request;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Mail;
 
 class UserController extends Controller
 {
@@ -36,28 +38,35 @@ class UserController extends Controller
             ], 422);
         }
 
-        // Création de l'utilisateur
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'email_verified_at' => null,
-        ]);
+        try {
+            // Création de l'utilisateur
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'email_verified_at' => null,
+            ]);
 
-        // Générer l'URL de vérification
-        $verificationUrl = $this->generateVerificationUrl($user);
+            // Générer l'URL de vérification
+            $verificationUrl = $this->generateVerificationUrl($user);
 
-        // Envoyer l'email de vérification
-        $user->notify(new VerifyEmailNotification($verificationUrl));
+            // Envoyer l'email de vérification
+            Mail::to($user->email)->send(new VerifyEmail($user, $verificationUrl));
 
-        // Retourner la réponse (sans token)
-        return response()->json([
-            'success' => true,
-            'message' => 'Utilisateur enregistré avec succès. Veuillez vérifier votre email pour activer votre compte.',
-            'data' => [
-                'user' => $user
-            ]
-        ], 201);
+            return response()->json([
+                'success' => true,
+                'message' => 'Utilisateur enregistré avec succès. Veuillez vérifier votre email pour activer votre compte.',
+                'data' => [
+                    'user' => $user
+                ]
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de l\'inscription',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -94,10 +103,14 @@ class UserController extends Controller
 
         // Vérifier si l'email est vérifié
         if (!$user->email_verified_at) {
+            // Générer l'URL de vérification
+            $verificationUrl = $this->generateVerificationUrl($user);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Veuillez vérifier votre adresse email avant de vous connecter.',
-                'requires_verification' => true
+                'requires_verification' => true,
+                'verification_url' => $verificationUrl // En développement seulement, à supprimer en production
             ], 403);
         }
 
