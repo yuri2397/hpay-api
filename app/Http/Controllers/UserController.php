@@ -56,9 +56,7 @@ class UserController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Utilisateur enregistré avec succès. Veuillez vérifier votre email pour activer votre compte.',
-                'data' => [
-                    'user' => $user
-                ]
+                'user' => $user
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
@@ -121,10 +119,8 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Connexion réussie',
-            'data' => [
-                'user' => $user,
-                'token' => $token
-            ]
+            'user' => $user,
+            'token' => $token
         ]);
     }
 
@@ -155,9 +151,7 @@ class UserController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => [
-                'user' => $request->user()
-            ]
+            'user' => $request->user()
         ]);
     }
 
