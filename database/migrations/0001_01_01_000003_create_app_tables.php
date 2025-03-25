@@ -25,13 +25,11 @@ class CreateAppTables extends Migration
             $table->softDeletes();
         });
 
-        // Nous supprimons la table client_types qui n'est plus nécessaire
 
         // Table pour les clients
-        Schema::create('clients', function (Blueprint $table) {
+        Schema::create('teams', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('name'); // Nom du client (entreprise ou personne)
-            $table->enum('type', ['customer', 'carrier']); // Type de client intégré directement
             $table->string('email')->unique();
             $table->string('phone')->nullable();
             $table->string('address')->nullable();
@@ -40,8 +38,7 @@ class CreateAppTables extends Migration
             $table->string('country')->nullable();
             $table->string('postal_code')->nullable();
             $table->string('tax_id')->nullable();
-            $table->json('client_references')->nullable(); // Pour stocker les références des clients du carrier
-            $table->boolean('is_active')->default(true); // Solde de commission pour les carriers
+            $table->enum('status', ['active', 'inactive', 'pending', 'blocked'])->default('pending');
             $table->timestamps();
             $table->softDeletes();
         });
@@ -50,7 +47,6 @@ class CreateAppTables extends Migration
         // Table pour les factures
         Schema::create('invoices', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->json('end_client_info')->nullable(); // Informations sur le client final si transitaire
             $table->string('reference')->nullable(); // Une seule référence par facture
             $table->string('invoice_type')->default('invoice'); // Type de facture intégré directement (fret, douane, etc.)
 
@@ -65,12 +61,8 @@ class CreateAppTables extends Migration
             // Stockage des données spécifiques à chaque format de compagnie
             $table->json('invoice_data')->nullable(); // Toutes les données spécifiques au format de la compagnie
 
-            // Référence à la facture originale
-            $table->string('document_path')->nullable(); // Chemin vers le PDF de la facture
-            $table->boolean('is_api_fetched')->default(false); // Indique si la facture a été récupérée via API
-
             $table->foreignUuid('shipping_company_id')->references('id')->on('shipping_companies');
-            $table->foreignUuid('client_id')->references('id')->on('clients');
+            $table->nullableUuidMorphs('client');
 
             $table->timestamps();
             $table->softDeletes();
@@ -110,19 +102,18 @@ class CreateAppTables extends Migration
         // Table pour les paiements - une facture liée à un seul paiement
         Schema::create('payments', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->json('end_client_info')->nullable(); // Informations sur le client final si payé par un transitaire
             $table->string('transaction_id')->nullable(); // ID de transaction externe
             $table->decimal('amount', 15, 2); // Montant total payé
             $table->decimal('invoice_amount', 15, 2); // Montant des factures
             $table->decimal('fee_amount', 15, 2); // Montant des frais de service
-            $table->string('currency', 3)->default('USD');
+            $table->string('currency', 3)->default('XOF');
             $table->enum('status', ['pending', 'processing', 'completed', 'failed', 'refunded'])->default('pending');
             $table->timestamp('payment_date')->nullable();
             $table->text('notes')->nullable();
             $table->json('payment_response')->nullable(); // Réponse du service de paiement
             $table->json('metadata')->nullable(); // Données supplémentaires
 
-            $table->foreignUuid('client_id')->references('id')->on('clients');
+            $table->nullableUuidMorphs('client');
             $table->foreignUuid('payment_method_id')->references('id')->on('payment_methods');
             $table->foreignUuid('service_fee_id')->references('id')->on('service_fees');
             $table->foreignUuid('invoice_id')->nullable()->references('id')->on('invoices');
@@ -134,20 +125,6 @@ class CreateAppTables extends Migration
         // Table pour la relation entre paiements et factures - N'EST PLUS NECESSAIRE car une facture a un seul paiement
         // Nous la supprimons
 
-        // Table pour les références temporaires de factures
-        Schema::create('invoice_references', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->string('reference_type'); // Type de référence (BL, conteneur, facture, etc.)
-            $table->string('reference_value'); // Valeur de la référence
-            $table->json('api_response')->nullable(); // Réponse de l'API lors de la recherche
-            $table->boolean('is_processed')->default(false);
-            $table->timestamp('processed_at')->nullable();
-
-            $table->foreignUuid('client_id')->references('id')->on('clients');
-            $table->foreignUuid('shipping_company_id')->references('id')->on('shipping_companies');
-
-            $table->timestamps();
-        });
 
         // Table pour les journaux d'API
         Schema::create('api_logs', function (Blueprint $table) {
@@ -184,11 +161,11 @@ class CreateAppTables extends Migration
         Schema::create('commission_accounts', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->decimal('balance', 15, 2)->default(0); // Solde actuel du compte
-            $table->string('currency', 3)->default('USD');
+            $table->string('currency', 3)->default('XOF');
             $table->boolean('is_active')->default(true);
+            $table->nullableUuidMorphs('client');
             $table->timestamps();
-
-            $table->foreignUuid('client_id')->references('id')->on('clients')->onDelete('cascade');
+            $table->softDeletes();
         });
 
         // Table pour les transactions des comptes de commission
@@ -196,7 +173,7 @@ class CreateAppTables extends Migration
             $table->uuid('id')->primary();
             $table->enum('type', ['deposit', 'withdrawal', 'commission', 'adjustment']);
             $table->decimal('amount', 15, 2);
-            $table->string('currency', 3)->default('USD');
+            $table->string('currency', 3)->default('XOF');
             $table->decimal('balance_after', 15, 2); // Solde après transaction
             $table->text('description')->nullable();
             $table->timestamps();
@@ -218,11 +195,7 @@ class CreateAppTables extends Migration
         Schema::dropIfExists('service_fees');
         Schema::dropIfExists('payment_methods');
         Schema::dropIfExists('invoices');
-        Schema::dropIfExists('invoice_types');
-        Schema::dropIfExists('client_types');
-
-        Schema::dropIfExists('clients');
-        Schema::dropIfExists('client_types');
+        Schema::dropIfExists('teams');
         Schema::dropIfExists('shipping_companies');
     }
 };
