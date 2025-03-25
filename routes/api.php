@@ -14,6 +14,7 @@ use App\Http\Controllers\ClientController;
 // Routes publiques (sans authentification)
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/login', [UserController::class, 'login']);
+Route::post('/forgot-password', [UserController::class, 'forgotPassword']);
 
 // Route pour renvoyer l'email de vérification via API
 Route::post('/email/verification-notification', [EmailVerificationController::class, 'sendVerificationEmail'])
@@ -24,10 +25,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [UserController::class, 'logout']);
     Route::get('/me', [UserController::class, 'me']);
 
-    // Routes pour le profil client
-    Route::prefix('profile')->group(function () {
-        Route::get('/', [ClientController::class, 'getUserProfile']);
-        Route::post('/', [ClientController::class, 'updateUserProfile']);
-        Route::get('/status', [ClientController::class, 'checkProfileStatus']);
-    });
 });
