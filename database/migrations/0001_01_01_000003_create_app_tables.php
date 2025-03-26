@@ -25,6 +25,14 @@ class CreateAppTables extends Migration
             $table->softDeletes();
         });
 
+        Schema::create('shipping_company_settings', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('shipping_company_id')->references('id')->on('shipping_companies');
+            $table->string('key');
+            $table->string('value');
+            $table->timestamps();
+        });
+
 
         // Table pour les clients
         Schema::create('teams', function (Blueprint $table) {
@@ -47,7 +55,7 @@ class CreateAppTables extends Migration
         // Table pour les factures
         Schema::create('invoices', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('reference')->nullable(); // Une seule référence par facture
+            $table->string('reference')->unique()->nullable(); // Une seule référence par facture
             $table->string('invoice_type')->default('invoice'); // Type de facture intégré directement (fret, douane, etc.)
 
             // Champs standardisés mappés depuis les différents formats d'API
@@ -69,6 +77,17 @@ class CreateAppTables extends Migration
 
             // Chaque entreprise doit avoir un numéro de facture unique
             $table->unique(['shipping_company_id', 'invoice_number']);
+        });
+
+        // invoices fees
+        Schema::create('invoices_fees', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('invoice_id')->references('id')->on('invoices');
+            $table->decimal('amount', 15, 2);
+            $table->string('currency', 3)->default('XOF');
+            $table->string('notes')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
 
         // Table pour les méthodes de paiement
