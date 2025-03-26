@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\VerifyEmail;
 use App\Models\User;
+use App\Notifications\NewLoginNotification;
 use App\Notifications\VerifyEmailNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
+use Jenssegers\Agent\Agent;
 
 class UserController extends Controller
 {
@@ -79,6 +82,8 @@ class UserController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|string|email',
             'password' => 'required|string',
+            'device_id' => 'required|string',
+            'device_name' => 'required|string',
         ]);
 
         if ($validator->fails()) {
@@ -114,6 +119,17 @@ class UserController extends Controller
 
         // Créer un nouveau token
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        // Récupérer les informations sur la connexion
+        $loginInfo = $this->getLoginInfo($request);
+
+        // Envoyer une notification de nouvelle connexion
+        try {
+            Notification::sendNow($user, new NewLoginNotification($loginInfo));
+        } catch (\Exception $e) {
+            // On continue même si la notification échoue
+            // mais on pourrait logger l'erreur
+        }
 
         // Retourner la réponse
         return response()->json([
@@ -168,5 +184,53 @@ class UserController extends Controller
         );
 
         return $url;
+    }
+
+    /**
+     * Récupérer les informations sur la connexion actuelle
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array
+     */
+    protected function getLoginInfo(Request $request)
+    {
+        // $request->ip() ??
+        $ip = '154.124.235.146';
+
+        // Utiliser Agent pour obtenir des informations sur le navigateur et l'appareil
+        // Nécessite d'installer le package jenssegers/agent
+        $agent = new Agent();
+        $agent->setUserAgent($request->userAgent());
+
+        $browser = $agent->browser() . ' ' . $agent->version($agent->browser());
+        $device = $agent->device();
+        if ($agent->isDesktop()) {
+            $device = 'Ordinateur';
+        } elseif ($agent->isPhone()) {
+            $device = 'Téléphone mobile';
+        } elseif ($agent->isTablet()) {
+            $device = 'Tablette';
+        }
+
+        $platform = $agent->platform() . ' ' . $agent->version($agent->platform());
+
+        // On pourrait utiliser un service de géolocalisation d'IP ici
+        // Mais pour l'exemple, on va juste simuler
+        $location = 'Localisation inconnue';
+
+        // Vous pourriez utiliser un service comme ipinfo.io ou geoip
+        // Par exemple :\
+        $ipDetails = json_decode(file_get_contents("http://ipinfo.io/{$ip}/json"));
+        $location = $ipDetails->city . ', ' . $ipDetails->region . ', ' . $ipDetails->country;
+
+        return [
+            'time' => now()->format('d/m/Y H:i:s'),
+            'ip' => $ip,
+            'location' => $location,
+            'device' => $device . ' (' . $platform . ')',
+            'browser' => $browser,
+            'device_id' => $request->device_id,
+            'device_name' => $request->device_name,
+        ];
     }
 }

@@ -14,9 +14,6 @@ class Invoice extends Model
 
     protected $fillable = [
         'shipping_company_id',
-        'client_id',
-        'payment_id',
-        'end_client_info',
         'reference',
         'invoice_type',
         'invoice_number',
@@ -24,15 +21,13 @@ class Invoice extends Model
         'currency',
         'status',
         'invoice_data',
-        'document_path',
-        'is_api_fetched',
+        'client_id',
+        'client_type',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
-        'end_client_info' => 'array',
         'invoice_data' => 'array',
-        'is_api_fetched' => 'boolean',
     ];
 
 
@@ -49,7 +44,7 @@ class Invoice extends Model
      */
     public function client()
     {
-        return $this->belongsTo(Client::class);
+        return $this->morphTo();
     }
 
     /**
@@ -57,7 +52,7 @@ class Invoice extends Model
      */
     public function payment()
     {
-        return $this->belongsTo(Payment::class);
+        return $this->morphTo();
     }
 
     /**
@@ -65,7 +60,7 @@ class Invoice extends Model
      */
     public function commissionTransactions()
     {
-        return $this->hasMany(CommissionTransaction::class);
+        return $this->morphMany(CommissionTransaction::class, 'commissionable');
     }
 
     /**

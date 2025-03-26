@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'cmacgm' => [
+        'client_id' => env('CMA_CGM_CLIENT_ID'),
+        'client_secret' => env('CMA_CGM_CLIENT_SECRET'),
+        'bearer_token' => env('CMA_CGM_CLIENT_BEARER_TOKEN'),
+        'api_endpoint_v1' => env('CMA_CGM_API_ENDPOINT_V1'),
+        'api_endpoint_v2' => env('CMA_CGM_API_ENDPOINT_V2'),
+        'token_url' => env('CMA_CGM_TOKEN_URL'),
+    ],
+
 ];
