@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\ShippingCompany;
 use App\Models\Invoice;
+use App\Models\ShippingCompanySetting;
 use App\Services\CmaCgmApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
+use App\Models\InvoiceFee;
 
 class CmaCgmInvoiceController extends Controller
 {
@@ -68,7 +70,15 @@ class CmaCgmInvoiceController extends Controller
             $totalChargesAmount = $response['totalChargesAmount'] ?? 0;
             $taxAmount = $response['taxAmount'] ?? 0;
 
-            $totalToPay = $totalChargesAmount + $taxAmount;
+            // Calcul de la commission basé sur le pourcentage configuré
+            $commissionPercentage = ShippingCompanySetting::getSetting($shippingCompany, 'commission_percentage', 0.9);
+            $commissionAmount = ($totalChargesAmount + $taxAmount) * ($commissionPercentage / 100);
+
+            // Arrondir à 2 décimales
+            $commissionAmount = round($commissionAmount, 2);
+
+            // Calculer le montant total à payer incluant les frais
+            $totalToPay = $totalChargesAmount + $taxAmount + $commissionAmount;
 
             // Vérifier si la facture existe déjà dans notre système
             $existingInvoice = Invoice::where('invoice_number', $invoiceNo)
@@ -86,6 +96,26 @@ class CmaCgmInvoiceController extends Controller
                 ]);
 
                 $invoice = $existingInvoice;
+
+                // Vérifier si des frais de commission existent déjà
+                $existingFee = InvoiceFee::where('invoice_id', $invoice->id)->first();
+
+                if ($existingFee) {
+                    // Mettre à jour les frais existants
+                    $existingFee->update([
+                        'amount' => $commissionAmount,
+                        'currency' => $invoice->currency,
+                        'notes' => 'Frais de commission (' . $commissionPercentage . '%)'
+                    ]);
+                } else {
+                    // Créer de nouveaux frais de commission
+                    InvoiceFee::create([
+                        'invoice_id' => $invoice->id,
+                        'amount' => $commissionAmount,
+                        'currency' => $invoice->currency,
+                        'notes' => 'Frais de commission (' . $commissionPercentage . '%)'
+                    ]);
+                }
             } else {
                 // Créer une nouvelle facture
                 $invoice = Invoice::create([
@@ -100,6 +130,14 @@ class CmaCgmInvoiceController extends Controller
                     'currency' => $invoiceData['currencyCode'] ?? 'XOF',
                     'status' => 'pending',
                 ]);
+
+                // Créer les frais de commission pour la nouvelle facture
+                InvoiceFee::create([
+                    'invoice_id' => $invoice->id,
+                    'amount' => $commissionAmount,
+                    'currency' => $invoice->currency,
+                    'notes' => 'Frais de commission (' . $commissionPercentage . '%)'
+                ]);
             }
 
             $invoice->invoice_data = null;
@@ -113,6 +151,7 @@ class CmaCgmInvoiceController extends Controller
                 'payable_to' => $payment['payableTo'] ?? null,
                 'total_charges' => $totalChargesAmount,
                 'tax_amount' => $taxAmount,
+                'commission_amount' => $commissionAmount,
                 'total_to_pay' => $totalToPay,
                 'payment_status' => $payment['paymentStatus'] ?? null,
             ]);
@@ -207,48 +246,26 @@ class CmaCgmInvoiceController extends Controller
     }
 
     /**
-     * Télécharger le PDF d'une facture.
+     * Télécharger ou prévisualiser le PDF d'une facture.
      *
+     * @param Request $request
      * @param string $id
      * @return \Illuminate\Http\Response
      */
-    public function downloadInvoicePdf(string $id)
+    public function downloadInvoicePdf(Request $request, string $id)
     {
         try {
             $invoice = Invoice::findOrFail($id);
 
-            if (!$invoice->document_path || !Storage::disk('local')->exists($invoice->document_path)) {
-                // Si nous n'avons pas le PDF stocké localement, essayons de le récupérer via l'API
-                $shippingCompany = $this->getCmaCgmCompany();
-                $apiService = new CmaCgmApiService($shippingCompany);
+            // Initialiser le service
+            $shippingCompany = $this->getCmaCgmCompany();
+            $apiService = new CmaCgmApiService($shippingCompany);
 
-                $response = $apiService->getInvoiceCopy($invoice->invoice_number);
-
-                if (isset($response['invoiceDocument']) && !empty($response['invoiceDocument'])) {
-                    $pdfContent = base64_decode($response['invoiceDocument']);
-                    $pdfPath = 'invoices/cmacgm/' . $invoice->invoice_number . '_' . Str::random(8) . '.pdf';
-                    Storage::disk('local')->put($pdfPath, $pdfContent);
-
-                    // Mettre à jour le chemin du document
-                    $invoice->update(['document_path' => $pdfPath]);
-                } else {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'PDF de facture non disponible'
-                    ], 404);
-                }
-            }
-
-            // Retourner le fichier PDF
-            $filename = 'facture_' . $invoice->invoice_number . '.pdf';
-            return Storage::disk('local')->download($invoice->document_path, $filename, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="' . $filename . '"'
-            ]);
+            return $apiService->generateInvoicePdf($invoice);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors du téléchargement du PDF: ' . $e->getMessage(),
+                'message' => 'Erreur lors du téléchargement ou de la génération du PDF: ' . $e->getMessage(),
                 'error' => $e->getMessage()
             ], 500);
         }

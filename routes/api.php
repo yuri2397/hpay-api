@@ -44,7 +44,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Routes pour l'API CMA CGM
-Route::middleware('auth:sanctum')->prefix('cmacgm')->group(function () {
+Route::prefix('cmacgm')->group(function () {
     // Récupérer une facture par son numéro
     Route::get('invoices/{invoiceNo}', [CmaCgmInvoiceController::class, 'getInvoice']);
 
@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->prefix('cmacgm')->group(function () {
 
     // Télécharger le PDF d'une facture
     Route::get('invoices/{id}/pdf', [CmaCgmInvoiceController::class, 'downloadInvoicePdf']);
+
 });
 
 // Route alternative pour télécharger les PDFs des factures (accessible sans préfixe cmacgm)

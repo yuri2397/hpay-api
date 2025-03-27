@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             InitialDataSeeder::class,
+            CmaCgmSettingsSeeder::class,
         ]);
     }
 }

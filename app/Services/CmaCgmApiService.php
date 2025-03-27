@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ApiLog;
+use App\Models\Invoice;
 use App\Models\ShippingCompany;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -220,6 +221,71 @@ class CmaCgmApiService
             ]);
 
             throw new \Exception("Failed to obtain access token: " . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Générer un PDF de facture en utilisant Tailwind CSS.
+     *
+     * @param Invoice $invoice La facture à convertir en PDF
+     * @param bool $returnView Si vrai, retourne la vue au lieu du contenu PDF
+     * @return mixed Contenu PDF ou vue selon le paramètre $returnView
+     * @throws \Exception
+     */
+    public function generateInvoicePdf(Invoice $invoice, bool $returnView = false)
+    {
+        try {
+            // Récupérer les données de la facture
+            $invoiceData = $invoice->invoice_data;
+
+            if (empty($invoiceData)) {
+                // Si les données ne sont pas déjà stockées, essayer de les récupérer via l'API
+                $invoiceData = $this->getInvoiceData($invoice->invoice_number);
+
+                // Mettre à jour la facture avec les données récupérées
+                $invoice->update(['invoice_data' => $invoiceData]);
+            }
+
+            // Récupérer les frais de commission associés à cette facture
+            $fees = \App\Models\InvoiceFee::where('invoice_id', $invoice->id)->get();
+            $commissionAmount = $fees->sum('amount');
+
+            // Extraire les informations nécessaires pour le PDF
+            $invoiceDetails = $invoiceData['invoice'] ?? [];
+            $issuer = $invoiceData['issuer'] ?? [];
+            $charges = $invoiceData['charges'] ?? [];
+            $payment = $invoiceData['payment'] ?? [];
+            $totalChargesAmount = $invoiceData['totalChargesAmount'] ?? 0;
+            $taxAmount = $invoiceData['taxAmount'] ?? 0;
+            $netInvoiceAmount = $totalChargesAmount + $taxAmount;
+            $totalAmount = $totalChargesAmount + $taxAmount + $commissionAmount;
+
+            // Récupérer le logo de CMA CGM (s'il existe)
+            $logo = config('app.logo');
+            $shippingCompany = $invoice->shippingCompany;
+
+            // Préparer les données pour la vue
+            $data = [
+                'invoice' => $invoice,
+                'issuer' => $issuer,
+                'invoiceDetails' => $invoiceDetails,
+                'charges' => $charges,
+                'payment' => $payment,
+                'totalChargesAmount' => $totalChargesAmount,
+                'netInvoiceAmount' => $netInvoiceAmount,
+                'taxAmount' => $taxAmount,
+                'commissionAmount' => $commissionAmount,
+                'totalAmount' => $totalAmount,
+                'logo' => $logo,
+                'company' => $shippingCompany
+            ];
+
+            // Générer la vue du PDF
+            return view('pdfs.cma-cgm-invoice', $data);
+
+        } catch (\Exception $e) {
+            Log::error('Erreur lors de la génération du PDF: ' . $e->getMessage(), ['invoice_id' => $invoice->id]);
+            throw new \Exception('Erreur lors de la génération du PDF: ' . $e->getMessage());
         }
     }
 }
