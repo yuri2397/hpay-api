@@ -149,7 +149,20 @@ class CmaCgmApiService
         }
 
 
-        // return $this->makeRequest('GET', $endpoint, $params, $scope, $headers, $version);
+        if (!$this->accessToken || !$this->tokenExpires || $this->tokenExpires->isPast()) {
+            $this->accessToken = $this->getAccessToken('invoicepartnerdata:load:be');
+        }
+
+        $response = Http::asForm()->withHeaders([
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $this->accessToken
+        ])->get($this->baseUrlV2 . $endpoint, $params);
+
+        Log::info('CMA CGM API Response', ['response' => $response->json()]);
+
+        return $response->json();
+
     }
 
 

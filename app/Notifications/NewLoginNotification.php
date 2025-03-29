@@ -89,7 +89,8 @@ class NewLoginNotification extends Notification implements ShouldQueue
 
     public function toDatabase($notifiable)
     {
-        $this->notificationService->sendNotification($notifiable, 'new_login', 'Nouvelle connexion à votre compte détectée', $this->toArray($notifiable));
+        $this->notificationService
+            ->sendNotification($notifiable, 'new_login', 'Nous avons détecté une nouvelle connexion à votre compte. Veuillez vérifier si c\'est vous qui avez effectué cette connexion.', $this->toArray($notifiable));
     }
     /**
      * Get the array representation of the notification.
@@ -101,7 +102,7 @@ class NewLoginNotification extends Notification implements ShouldQueue
     {
         return [
             'type' => NotificationModel::NEW_LOGIN_NOTIFICATION,
-            'message' => 'Nouvelle connexion à votre compte détectée',
+            'message' => 'Nous avons détecté une nouvelle connexion à votre compte. Veuillez vérifier si c\'est vous qui avez effectué cette connexion.',
             'login_time' => $this->loginInfo['time'],
             'ip_address' => $this->loginInfo['ip'],
             'location' => $this->loginInfo['location'] ?? null,

@@ -55,7 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->prefix('cmacgm')->group(function () {
     // Récupérer une facture par son numéro
     Route::get('invoices/{invoiceNo}', [CmaCgmInvoiceController::class, 'getInvoice']);
-
+    Route::get('invoices/{transportDocumentReference}/shipment', [CmaCgmInvoiceController::class, 'getShipmentInvoices']);
     // Télécharger le PDF d'une facture
     Route::get('invoices/{id}/pdf', [CmaCgmInvoiceController::class, 'downloadInvoicePdf']);
 });

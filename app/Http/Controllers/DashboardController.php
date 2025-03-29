@@ -10,9 +10,26 @@ use Illuminate\Http\Request;
 class DashboardController extends Controller
 {
     // invoices statistics
-    public function invoicesStatistics()
+    public function invoicesStatistics(Request $request)
     {
-        $invoices = Invoice::whereClientId(Auth::user()->id)->get();
+        $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+        ]);
+
+        $invoices = Invoice::whereClientId(Auth::user()->id);
+
+        if ($request->start_date) {
+            // on prends pas en core les heures
+            $invoices->whereDate('created_at', '>=', date('Y-m-d', strtotime($request->start_date)));
+        }
+
+        if ($request->end_date) {
+            // on prends pas en core les heures
+            $invoices->whereDate('created_at', '<=', date('Y-m-d', strtotime($request->end_date)));
+        }
+
+        $invoices = $invoices->get();
 
         // amounts
         $total_amount = $invoices->sum('amount');
@@ -28,6 +45,22 @@ class DashboardController extends Controller
         $total_failed_invoices = $invoices->where('status', 'failed')->count();
         $total_cancelled_invoices = $invoices->where('status', 'cancelled')->count();
 
+
+        // fees
+        $fees = InvoiceFee::whereHas('invoice', function ($query) use ($request) {
+            $query->whereClientId(Auth::user()->id);
+            if ($request->start_date) {
+                $query->whereDate('created_at', '>=', date('Y-m-d', strtotime($request->start_date)));
+            }
+            if ($request->end_date) {
+                $query->whereDate('created_at', '<=', date('Y-m-d', strtotime($request->end_date)));
+            }
+            $query->where('status', 'paid');
+        });
+        $total_fees = $fees->sum('amount');
+        $total_fees_amount = $fees->sum('amount');
+        $total_fees_count = $fees->count();
+
         $data = [
             'total_amount' => (int) $total_amount,
             'total_paied_amount' => (int) $total_paied_amount,
@@ -39,6 +72,9 @@ class DashboardController extends Controller
             'total_pending_invoices' => (int) $total_pending_invoices,
             'total_failed_invoices' => (int) $total_failed_invoices,
             'total_cancelled_invoices' => (int) $total_cancelled_invoices,
+            'total_fees' => (int) $total_fees,
+            'total_fees_amount' => (int) $total_fees_amount,
+            'total_fees_count' => (int) $total_fees_count,
         ];
         return response()->json($data);
     }

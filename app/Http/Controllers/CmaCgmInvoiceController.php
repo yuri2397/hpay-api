@@ -198,55 +198,17 @@ class CmaCgmInvoiceController extends Controller
 
             // Appeler l'API
             $response = $apiService->getShipmentInvoices($transportDocumentReference, $behalfOf, $range);
-
-            // Synchroniser les factures avec notre base de données
-            $invoices = [];
-            foreach ($response as $invoiceData) {
-                $invoiceNo = $invoiceData['invoiceNo'] ?? null;
-
-                if ($invoiceNo) {
-                    // Vérifier si la facture existe déjà
-                    $existingInvoice = Invoice::where('invoice_number', $invoiceNo)
-                        ->where('shipping_company_id', $shippingCompany->id)
-                        ->first();
-
-                    if ($existingInvoice) {
-                        // Mettre à jour la facture existante
-                        $existingInvoice->update([
-                            'reference' => $invoiceData['transportDocumentReference'] ?? null,
-                            'invoice_type' => $invoiceData['invoiceType'] ?? 'Invoice',
-                            'amount' => $invoiceData['invoiceAmount'] ?? 0,
-                            'currency' => $invoiceData['currencyCode'] ?? 'USD',
-                            'invoice_data' => $invoiceData,
-                            'client_id' => Auth::user()->id,
-                            'client_type' => User::class,
-                        ]);
-
-                        $invoices[] = $existingInvoice;
-                    } else {
-                        // Créer une nouvelle facture
-                        $invoice = Invoice::create([
-                            'shipping_company_id' => $shippingCompany->id,
-                            'invoice_number' => $invoiceNo,
-                            'reference' => $invoiceData['transportDocumentReference'] ?? null,
-                            'invoice_type' => $invoiceData['invoiceType'] ?? 'Invoice',
-                            'amount' => $invoiceData['invoiceAmount'] ?? 0,
-                            'currency' => $invoiceData['currencyCode'] ?? 'USD',
-                            'status' => 'pending',
-                            'invoice_data' => $invoiceData,
-                            'is_api_fetched' => true,
-                        ]);
-
-                        $invoices[] = $invoice;
-                    }
-                }
+            if (is_array($response)) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $response,
+                    'total_count' => count($response) // Nombre total de factures retournées par l'API
+                ]);
             }
-
             return response()->json([
-                'success' => true,
-                'data' => $invoices,
-                'total_count' => count($response) // Nombre total de factures retournées par l'API
-            ]);
+                'success' => false,
+                'message' => 'Aucune facture trouvée pour cet envoi'
+            ], 404);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
