@@ -431,43 +431,40 @@ class UserController extends Controller
      */
     protected function getLoginInfo(Request $request)
     {
-        // $request->ip() ??
-        $ip = $request->ip();
+        // Récupérer l'IP du client (en tenant compte des proxys)
+        $ip = $request->header('X-Forwarded-For') ?? $request->ip();
+        $browser = $request->userAgent();
+        $device = $request->input('device_id', 'Inconnu');
+        $platform = $request->input('device_name', 'Inconnu');
 
-        // Utiliser Agent pour obtenir des informations sur le navigateur et l'appareil
-        // Nécessite d'installer le package jenssegers/agent
-        $agent = new Agent();
-        $agent->setUserAgent($request->userAgent());
+        // Initialiser les variables par défaut en cas d'erreur de récupération
+        $location = 'Non disponible';
 
-        $browser = $agent->browser() . ' ' . $agent->version($agent->browser());
-        $device = $agent->device();
-        if ($agent->isDesktop()) {
-            $device = 'Ordinateur';
-        } elseif ($agent->isPhone()) {
-            $device = 'Téléphone mobile';
-        } elseif ($agent->isTablet()) {
-            $device = 'Tablette';
+        try {
+            // Appeler l'API pour obtenir les informations de localisation
+            $response = Http::timeout(5)->get("http://ipinfo.io/{$ip}/json");
+
+            if ($response->successful()) {
+                $ipDetails = $response->json();
+                $city = $ipDetails['city'] ?? 'Inconnu';
+                $region = $ipDetails['region'] ?? 'Inconnu';
+                $country = $ipDetails['country'] ?? 'Inconnu';
+                $location = "{$city}, {$region}, {$country}";
+            }
+        } catch (\Exception $e) {
+            // Gérer l'erreur d'appel API (timeout, indisponibilité, etc.)
+            Log::error("Erreur lors de la récupération des informations IP : " . $e->getMessage());
         }
 
-        $platform = $agent->platform() . ' ' . $agent->version($agent->platform());
-
-        // On pourrait utiliser un service de géolocalisation d'IP ici
-        // Mais pour l'exemple, on va juste simuler
-        $location = 'Localisation inconnue';
-
-        // Vous pourriez utiliser un service comme ipinfo.io ou geoip
-        // Par exemple :\
-        $ipDetails = json_decode(file_get_contents("http://ipinfo.io/{$ip}/json"));
-        $location = $ipDetails->city . ', ' . $ipDetails->region . ', ' . $ipDetails->country;
-
+        // Retourner les informations sous forme de tableau
         return [
             'time' => now()->format('d/m/Y H:i:s'),
             'ip' => $ip,
             'location' => $location,
-            'device' => $device . ' (' . $platform . ')',
+            'device' => "{$device} ({$platform})",
             'browser' => $browser,
-            'device_id' => $request->device_id,
-            'device_name' => $request->device_name,
+            'device_id' => $device,
+            'device_name' => $platform,
         ];
     }
 }
