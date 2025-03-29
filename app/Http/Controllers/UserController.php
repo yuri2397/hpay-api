@@ -432,7 +432,7 @@ class UserController extends Controller
     protected function getLoginInfo(Request $request)
     {
         // $request->ip() ??
-        $ip = '154.124.235.146';
+        $ip = $request->ip();
 
         // Utiliser Agent pour obtenir des informations sur le navigateur et l'appareil
         // Nécessite d'installer le package jenssegers/agent
