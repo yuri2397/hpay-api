@@ -2,7 +2,7 @@
 
 namespace App\Notifications;
 
-use App\Models\Notification as ModelsNotification;
+use App\Models\Notification as NotificationModel;
 use App\Services\NotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -100,7 +100,7 @@ class NewLoginNotification extends Notification implements ShouldQueue
     public function toArray($notifiable)
     {
         return [
-            'type' => 'new_login',
+            'type' => NotificationModel::NEW_LOGIN_NOTIFICATION,
             'message' => 'Nouvelle connexion à votre compte détectée',
             'login_time' => $this->loginInfo['time'],
             'ip_address' => $this->loginInfo['ip'],

@@ -12,6 +12,17 @@ class Invoice extends Model
 {
     use HasFactory, SoftDeletes, HasUuid;
 
+    const STATUS_PENDING = 'pending';
+    const STATUS_PAID = 'paid';
+    const STATUS_FAILED = 'failed';
+    const STATUS_CANCELLED = 'cancelled';
+
+    const STATUS_LIST = [
+        self::STATUS_PENDING,
+        self::STATUS_PAID,
+        self::STATUS_FAILED,
+        self::STATUS_CANCELLED,
+    ];
     protected $fillable = [
         'shipping_company_id',
         'reference',
@@ -30,6 +41,13 @@ class Invoice extends Model
         'invoice_data' => 'array',
     ];
 
+    protected $hidden = [
+        'invoice_data',
+        'created_at',
+        'updated_at',
+        'deleted_at',
+    ];
+
 
     /**
      * Get the shipping company that owns the invoice.
@@ -37,6 +55,14 @@ class Invoice extends Model
     public function shippingCompany()
     {
         return $this->belongsTo(ShippingCompany::class);
+    }
+
+    /**
+     * Get the fees associated with the invoice.
+     */
+    public function fees()
+    {
+        return $this->hasMany(InvoiceFee::class);
     }
 
     /**
@@ -94,4 +120,5 @@ class Invoice extends Model
     {
         return $query->where('status', 'cancelled');
     }
+
 }

@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
 use App\Models\InvoiceFee;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 
 class CmaCgmInvoiceController extends Controller
 {
@@ -122,7 +124,7 @@ class CmaCgmInvoiceController extends Controller
                     'reference' => Uuid::uuid4(),
                     'shipping_company_id' => $shippingCompany->id,
                     'invoice_data' => $response, // Stocker la réponse complète
-                    'client_id' => auth()->id(),
+                    'client_id' => Auth::user()->id,
                     'client_type' => User::class,
                     'invoice_number' => $invoiceNo,
                     'invoice_type' => $invoiceData['invoiceType'] ?? 'Invoice',
@@ -166,6 +168,15 @@ class CmaCgmInvoiceController extends Controller
     }
 
     /**
+     * Payer une facture
+     *
+     * @param Request $request
+     * @param string $id
+     * @return \Illuminate\Http\Response
+     */
+    public function payInvoice(Request $request, string $id) {}
+
+    /**
      * Récupérer la liste des factures pour un envoi.
      *
      * @param Request $request
@@ -207,7 +218,7 @@ class CmaCgmInvoiceController extends Controller
                             'amount' => $invoiceData['invoiceAmount'] ?? 0,
                             'currency' => $invoiceData['currencyCode'] ?? 'USD',
                             'invoice_data' => $invoiceData,
-                            'client_id' => auth()->id(),
+                            'client_id' => Auth::user()->id,
                             'client_type' => User::class,
                         ]);
 

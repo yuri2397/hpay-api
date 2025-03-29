@@ -10,6 +10,9 @@ class Notification extends Model
 {
     use HasFactory, HasUuid;
 
+    const NEW_PASSWORD_NOTIFICATION = 'new_password_notification';
+    const NEW_EMAIL_NOTIFICATION = 'new_email_notification';
+    const NEW_LOGIN_NOTIFICATION = 'new_login_notification';
     protected $fillable = [
         'notifiable_id',
         'notifiable_type',

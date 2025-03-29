@@ -29,6 +29,12 @@ class InvoiceFee extends Model
         'amount' => 'decimal:2',
     ];
 
+    protected $hidden = [
+        'created_at',
+        'updated_at',
+        'deleted_at',
+    ];
+
     /**
      * Get the invoice that owns the fee.
      */

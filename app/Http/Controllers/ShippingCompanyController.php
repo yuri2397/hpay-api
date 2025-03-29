@@ -40,10 +40,6 @@ class ShippingCompanyController extends Controller
         $shippingCompanies = $query->orderBy('created_at', 'desc')
             ->simplePaginate($perPage, ['*'], 'page', $page);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Liste des compagnies maritimes récupérée avec succès',
-            'data' => $shippingCompanies
-        ]);
+        return $shippingCompanies;
     }
 }

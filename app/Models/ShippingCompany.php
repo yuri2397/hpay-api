@@ -11,6 +11,21 @@ class ShippingCompany extends Model
 {
     use HasFactory, SoftDeletes, HasUuid;
 
+    const CMACGM = 'cmacgm';
+    const DPWORLD = 'dpworld';
+    const DHL = 'dhl';
+    const FEDEX = 'fedex';
+    const UPS = 'ups';
+    const USPS = 'usps';
+
+    const CODE_LIST = [
+        self::CMACGM,
+        self::DPWORLD,
+        self::DHL,
+        self::FEDEX,
+        self::UPS,
+        self::USPS,
+    ];
     protected $fillable = [
         'name',
         'api_key',
@@ -21,10 +36,20 @@ class ShippingCompany extends Model
         'contact_email',
         'contact_phone',
         'logo',
+        'code',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+    ];
+
+    protected $hidden = [
+        'created_at',
+        'updated_at',
+        'deleted_at',
+        'api_key',
+        'api_secret',
+        'api_endpoint',
     ];
 
     /**

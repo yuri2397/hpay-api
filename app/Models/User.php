@@ -44,4 +44,18 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+
+    /**
+     * Get the invoices associated with the user.
+     */
+    public function invoices()
+    {
+        return $this->morphMany(Invoice::class, 'client');
+    }
+
+    public function notifications()
+    {
+        return $this->morphMany(Notification::class, 'notifiable');
+    }
 }

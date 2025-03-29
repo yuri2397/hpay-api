@@ -4,17 +4,24 @@ namespace App\Http\Controllers;
 
 use App\Mail\VerifyEmail;
 use App\Models\User;
+use App\Notifications\AfterResetPasswordNotification;
 use App\Notifications\NewLoginNotification;
+use App\Notifications\RequestResetPasswordNotification;
 use App\Notifications\VerifyEmailNotification;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Jenssegers\Agent\Agent;
+use App\Models\Notification as NotificationModel;
+use App\Notifications\UserPasswordUpdatedNotification;
+use Illuminate\Support\Facades\Cache;
 
 class UserController extends Controller
 {
@@ -89,7 +96,7 @@ class UserController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur de validation',
+                'message' => 'Les informations d\'identification ne correspondent pas à nos enregistrements.',
                 'errors' => $validator->errors()
             ], 422);
         }
@@ -166,16 +173,203 @@ class UserController extends Controller
         return response()->json($request->user());
     }
 
+    // update user information
+    public function updateUserInformation(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $request->user()->id,
+        ]);
+
+        $user = $request->user();
+        $user->name = $request->name;
+        $user->email = $request->email;
+        $user->save();
+
+        return response()->json($user->refresh());
+    }
+
+    public function lastLogginSession(Request $request)
+    {
+        $user = $request->user();
+        // last notification with type NEW_LOGIN_NOTIFICATION
+        $lastLogin = $user->notifications()->where('type', NotificationModel::NEW_LOGIN_NOTIFICATION)->latest()->first();
+        if ($lastLogin) {
+            return response()->json([
+                'browser' => $lastLogin->data['browser'],
+                'device' => $lastLogin->data['device'],
+                'ip_address' => $lastLogin->data['ip_address'],
+                'location' => $lastLogin->data['location'],
+                'login_time' => $lastLogin->data['login_time'],
+            ]);
+        }
+        return response()->json([
+            'success' => false,
+            'message' => 'Aucune session de connexion trouvée.'
+        ], 404);
+    }
+
+    public function changePasswordForCurrentUser(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/',
+        ], [
+            'current_password.required' => 'Le mot de passe actuel est requis.',
+            'password.required' => 'Le mot de passe est requis.',
+            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'password.confirmed' => 'Les mots de passe ne correspondent pas.',
+            'password.regex' => 'Le mot de passe doit contenir au moins une lettre majuscule, une lettre minuscule et un chiffre et une longueur de 8 caractères.'
+        ]);
+
+        try {
+            $user = $request->user();
+
+            if (!Hash::check($request->current_password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le mot de passe actuel est incorrect.'
+                ], 401);
+            }
+
+            $user->password = Hash::make($request->password);
+
+            Notification::sendNow($user, new UserPasswordUpdatedNotification($user));
+
+            $user->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Le mot de passe a été mis à jour avec succès.'
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors de la mise à jour du mot de passe.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Reset password and send link to email
+     */
+    public function requestResetPasswordLink(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|string|email|exists:users,email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucun utilisateur trouvé avec cette adresse email.'
+            ], 404);
+        }
+        $url = $this->generateVerificationUrl($user, 'password.reset');
+
+        Notification::sendNow($user, new RequestResetPasswordNotification($user, $url));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Un lien de réinitialisation de mot de passe a été envoyé à votre adresse email.'
+        ]);
+    }
+
+    /**
+     * Update password
+     */
+    public function updatePassword(Request $request, NotificationService $notificationService)
+    {
+        $request->validate([
+            'password' => 'required|string|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/',
+            'token' => 'required|string', // hash de l'url signée
+            'email' => 'required|string|email|exists:users,email',
+        ], [
+            'password.required' => 'Le mot de passe est requis.',
+            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'password.confirmed' => 'Les mots de passe ne correspondent pas.',
+            'token.required' => 'Le jeton est requis.',
+            'email.required' => 'L\'adresse email est requise.',
+            'password.regex' => 'Le mot de passe doit contenir au moins une lettre majuscule, une lettre minuscule et un chiffre et une longueur de 8 caractères.'
+        ]);
+
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucun utilisateur trouvé avec cette adresse email.'
+            ], 404);
+        }
+
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        $notificationService = new NotificationService();
+        $notificationService->saveNotification([
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'type' => NotificationModel::NEW_PASSWORD_NOTIFICATION,
+            'message' => 'Votre mot de passe a été réinitialisé avec succès.',
+            'data' => [
+                'message' => 'Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.',
+                'date' => now()->format('d/m/Y H:i:s'),
+                'user' => $user
+            ]
+        ]);
+
+        Notification::sendNow($user, new AfterResetPasswordNotification($user));
+
+        // invalidate all tokens
+        $this->invalidateVerificationUrl($user->id, $request->token);
+
+        return view('auth.reset-password-success', [
+            'success' => true,
+            'message' => 'Votre mot de passe a été réinitialisé avec succès.',
+            'user' => $user
+        ]);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        if (!$request->hasValidSignature()) {
+            return view('auth.email-verification-page', [
+                'success' => false,
+                'expired' => true
+            ]);
+        }
+
+        $user = User::find($request->id);
+
+        if (!$user) {
+            return view('auth.email-verification-page', [
+                'success' => false,
+                'user_not_found' => true,
+                'error_message' => 'Utilisateur non trouvé.'
+            ]);
+        }
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Votre mot de passe a été réinitialisé avec succès.'
+        ]);
+    }
+
     /**
      * Génère une URL signée pour la vérification d'email.
      *
      * @param  \App\Models\User  $user
      * @return string
      */
-    protected function generateVerificationUrl($user)
+    protected function generateVerificationUrl($user, $route = 'verification.verify')
     {
         $url = URL::temporarySignedRoute(
-            'verification.verify',
+            $route,
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
             [
                 'id' => $user->id,
@@ -184,6 +378,49 @@ class UserController extends Controller
         );
 
         return $url;
+    }
+
+    /**
+     * Invalide une URL temporaire signée en modifiant le hash de l'email de l'utilisateur
+     *
+     * @param int $userId L'ID de l'utilisateur
+     * @param string $hash Le hash original utilisé pour la vérification
+     * @return bool True si l'URL a été invalidée avec succès, false sinon
+     */
+    protected function invalidateVerificationUrl($userId, $hash)
+    {
+        try {
+            // Récupérer l'utilisateur par son ID
+            $user = User::find($userId);
+
+            if (!$user) {
+                // L'utilisateur n'existe pas
+                return false;
+            }
+
+            // Vérifier que le hash correspond à l'email de l'utilisateur
+            if (sha1($user->email) !== $hash) {
+                // Le hash ne correspond pas, l'URL est déjà invalide
+                return false;
+            }
+
+            // Ajouter un suffixe aléatoire à l'email dans le cache
+            // Cette modification n'affecte pas l'email réel de l'utilisateur,
+            // mais rendra invalide toute URL utilisant le hash original
+            Cache::put(
+                'invalidated_verification_' . $userId,
+                Carbon::now()->timestamp,
+                Carbon::now()->addDays(7)
+            );
+
+            // Optionnel : enregistrer l'invalidation dans les journaux
+            Log::info("URL de vérification invalidée pour l'utilisateur #$userId");
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Erreur lors de l'invalidation de l'URL: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**

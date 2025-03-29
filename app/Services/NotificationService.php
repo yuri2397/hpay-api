@@ -182,4 +182,18 @@ class NotificationService
     }
 
 
+    // save notification in database
+    public function saveNotification($data)
+    {
+        $notification = new Notification();
+        $notification->notifiable_type = $data['notifiable_type'];
+        $notification->notifiable_id = $data['notifiable_id'];
+        $notification->type = $data['type'];
+        $notification->message = $data['message'];
+        $notification->data = $data['data'];
+        $notification->save();
+    }
+
+
+
 }

@@ -55,6 +55,41 @@ class EmailVerificationController extends Controller
         }
     }
 
+
+    /**
+     * Affiche la page de réinitialisation de mot de passe.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function resetPassword(Request $request, $id, $hash)
+    {
+        if (!$request->hasValidSignature()) {
+            return view('auth.password-reset-page-error', [
+                'success' => false,
+                'expired' => true
+            ]);
+        }
+
+        $user = User::find($id);
+
+        if (!$user) {
+            return view('auth.password-reset-page-error', [
+                'success' => false,
+                'user_not_found' => true,
+                'error_message' => 'Utilisateur non trouvé.'
+            ]);
+        }
+
+        return view('auth.update-password-page', [
+            'success' => true,
+            'token' => $hash,
+            'email' => $user->email
+        ]);
+    }
+
+
+
     /**
      * Vérifie l'email de l'utilisateur avec le lien reçu.
      * Affiche une page HTML avec le résultat.

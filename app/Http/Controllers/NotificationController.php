@@ -29,16 +29,19 @@ class NotificationController extends Controller
      */
     public function index(Request $request)
     {
+        $request->validate([
+            'perPage' => 'nullable|integer|min:1|max:100',
+            'unread' => 'nullable',
+            'page' => 'nullable|integer|min:1'
+        ]);
+
         $user = Auth::user();
         $perPage = $request->input('perPage', 15);
         $onlyUnread = $request->boolean('unread', false);
 
         $notifications = $this->notificationService->getUserNotifications($user, $onlyUnread, $perPage);
 
-        return response()->json([
-            'success' => true,
-            'data' => $notifications
-        ]);
+        return response()->json($notifications);
     }
 
     /**
