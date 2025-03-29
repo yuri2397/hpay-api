@@ -22,6 +22,7 @@ use Jenssegers\Agent\Agent;
 use App\Models\Notification as NotificationModel;
 use App\Notifications\UserPasswordUpdatedNotification;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 
 class UserController extends Controller
 {
