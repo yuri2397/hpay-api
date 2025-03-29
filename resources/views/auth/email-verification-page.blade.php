@@ -77,7 +77,7 @@
                 <p>Votre adresse email a été vérifiée et votre compte est maintenant actif.</p>
                 <p>Vous pouvez maintenant vous connecter à votre compte et profiter de tous nos services.</p>
             </div>
-            <a href="{{ url('/login') }}" class="button">Se connecter</a>
+            <a href="{{ env('FRONTEND_URL') }}" class="button">Se connecter</a>
         @elseif(isset($already_verified) && $already_verified)
             <div class="header warning">
                 <div class="icon">ℹ</div>
@@ -87,7 +87,7 @@
                 <p>Votre adresse email a déjà été vérifiée.</p>
                 <p>Vous pouvez vous connecter à votre compte et profiter de tous nos services.</p>
             </div>
-            <a href="{{ url('/login') }}" class="button">Se connecter</a>
+            <a href="{{ env('FRONTEND_URL') }}" class="button">Se connecter</a>
         @elseif(isset($expired) && $expired)
             <div class="header error">
                 <div class="icon">⚠</div>
@@ -97,7 +97,7 @@
                 <p>Le lien de vérification a expiré.</p>
                 <p>Veuillez demander un nouveau lien de vérification pour activer votre compte.</p>
             </div>
-            <a href="{{ url('/resend-verification') }}" class="button">Demander un nouveau lien</a>
+            <a href="{{ env('FRONTEND_URL') }}/resend-verification" class="button">Demander un nouveau lien</a>
         @else
             <div class="header error">
                 <div class="icon">✗</div>
@@ -107,7 +107,7 @@
                 <p>Une erreur s'est produite lors de la vérification de votre adresse email.</p>
                 <p>{{ isset($error_message) ? $error_message : 'Veuillez réessayer ou contacter notre support technique.' }}</p>
             </div>
-            <a href="{{ url('/contact') }}" class="button">Contacter le support</a>
+            <a href="{{ env('FRONTEND_URL') }}/contact" class="button">Contacter le support</a>
         @endif
     </div>
 </body>
