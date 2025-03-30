@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Jenssegers\Agent\Agent;
 use App\Models\Notification as NotificationModel;
+use App\Notifications\RequestNewUserCodePinNotification;
 use App\Notifications\UserPasswordUpdatedNotification;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -143,6 +144,81 @@ class UserController extends Controller
         return response()->json([
             'user' => $user,
             'token' => $token
+        ]);
+    }
+
+    /**
+     * Check user pin code
+     */
+    public function checkPinCode(Request $request)
+    {
+        $user = $request->user();
+
+        if (!Hash::check($request->pin_code, $user->pin_code)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le code PIN est incorrect.'
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Le code PIN est correct.'
+        ]);
+    }
+
+    /**
+     * Set user pin code
+     */
+    public function setPinCode(Request $request)
+    {
+        $request->validate([
+            'current_pin_code' => 'required|string|min:' . User::PIN_CODE_LENGTH . '|max:' . User::PIN_CODE_LENGTH,
+            'new_pin_code' => 'required|string|min:' . User::PIN_CODE_LENGTH . '|max:' . User::PIN_CODE_LENGTH,
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_pin_code, $user->pin_code)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le code PIN actuel est incorrect.'
+            ], 401);
+        }
+        $user->pin_code = Hash::make($request->new_pin_code);
+        $user->save();
+
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Le code PIN a été mis à jour avec succès. Un email a été envoyé à votre adresse email pour confirmer le nouveau code PIN.'
+        ]);
+    }
+
+    /**
+     * Request new user pin code
+     */
+    public function requestNewUserPinCode(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucun utilisateur trouvé avec cette adresse email.'
+            ], 404);
+        }
+
+        $pinCode = random_int(10000, 99999);
+
+        $user->pin_code = Hash::make($pinCode);
+        $user->save();
+
+        Notification::sendNow($user, new RequestNewUserCodePinNotification($pinCode, $user));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Un email a été envoyé à votre adresse email pour confirmer le nouveau code PIN.'
         ]);
     }
 

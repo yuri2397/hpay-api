@@ -12,7 +12,12 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes, HasUuid;
+    const STATUS_ACTIVE = 'active';
+    const STATUS_INACTIVE = 'inactive';
+    const STATUS_BLOCKED = 'blocked';
+    const STATUS_DELETED = 'deleted';
 
+    const PIN_CODE_LENGTH = 5;
     /**
      * The attributes that are mass assignable.
      *
@@ -22,6 +27,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'status',
+        'pin_code',
     ];
 
     /**
@@ -33,6 +40,7 @@ class User extends Authenticatable
         'password',
         'remember_token',
         'deleted_at',
+        'pin_code',
     ];
 
     /**

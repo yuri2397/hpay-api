@@ -35,6 +35,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/update-user-information', [UserController::class, 'updateUserInformation']);
     Route::get('/last-login-session', [UserController::class, 'lastLogginSession']);
 
+    // pin code
+    Route::post('/request-new-pin-code', [UserController::class, 'requestNewUserPinCode']);
+    Route::post('/check-pin-code', [UserController::class, 'checkPinCode']);
+    Route::post('/set-pin-code', [UserController::class, 'setPinCode']);
+
     // Routes pour les notifications
     Route::prefix('notifications')->group(function () {
         Route::get('/', [NotificationController::class, 'index']);
