@@ -36,6 +36,10 @@ class Invoice extends Model
         'client_type',
     ];
 
+    protected $appends = [
+        'formatted_amount',
+    ];
+
     protected $casts = [
         'amount' => 'decimal:2',
         'invoice_data' => 'array',
@@ -61,7 +65,7 @@ class Invoice extends Model
      */
     public function fees()
     {
-        return $this->hasMany(InvoiceFee::class);
+        return $this->hasOne(InvoiceFee::class);
     }
 
     /**
@@ -118,6 +122,12 @@ class Invoice extends Model
     public function scopeCancelled($query)
     {
         return $query->where('status', 'cancelled');
+    }
+
+    // get formmated amount avec le symbole de la monnaie et ajouter les espaces par millier
+    public function getFormattedAmountAttribute()
+    {
+        return number_format($this->amount, 2, ',', ' ') . ' ' . $this->currency;
     }
 
 }

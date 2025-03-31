@@ -9,6 +9,12 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
+    private $currency;
+
+    public function __construct()
+    {
+        $this->currency = 'XOF';
+    }
     // invoices statistics
     public function invoicesStatistics(Request $request)
     {
@@ -62,18 +68,18 @@ class DashboardController extends Controller
         $total_fees_count = $fees->count();
 
         $data = [
-            'total_amount' => (int) $total_amount,
-            'total_paied_amount' => (int) $total_paied_amount,
-            'total_pending_amount' => (int) $total_pending_amount,
-            'total_failed_amount' => (int) $total_failed_amount,
-            'total_cancelled_amount' => (int) $total_cancelled_amount,
+            'total_amount' => $this->formatAmount((float) $total_amount),
+            'total_paied_amount' => $this->formatAmount((float) $total_paied_amount),
+            'total_pending_amount' => $this->formatAmount((float) $total_pending_amount),
+            'total_failed_amount' => $this->formatAmount((float) $total_failed_amount),
+            'total_cancelled_amount' => $this->formatAmount((float) $total_cancelled_amount),
             'total_invoices' => (int) $total_invoices,
             'total_paied_invoices' => (int) $total_paied_invoices,
             'total_pending_invoices' => (int) $total_pending_invoices,
             'total_failed_invoices' => (int) $total_failed_invoices,
             'total_cancelled_invoices' => (int) $total_cancelled_invoices,
-            'total_fees' => (int) $total_fees,
-            'total_fees_amount' => (int) $total_fees_amount,
+            'total_fees' => $this->formatAmount((float) $total_fees),
+            'total_fees_amount' => $this->formatAmount((float) $total_fees_amount),
             'total_fees_count' => (int) $total_fees_count,
         ];
         return response()->json($data);
@@ -103,5 +109,10 @@ class DashboardController extends Controller
             'total_fees_count' => (int) $total_fees_count,
         ];
         return response()->json($data);
+    }
+
+    private function formatAmount($amount)
+    {
+        return number_format(floor($amount), 0, ',', ' ') . ' ' . $this->currency;
     }
 }

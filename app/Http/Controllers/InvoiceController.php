@@ -62,10 +62,11 @@ class InvoiceController extends Controller
     public function show(Request $request, Invoice $invoice)
     {
         $invoiceData = $invoice->invoice_data;
-
+        $totalToPay = $invoice->amount + $invoice->fees->amount;
         return response()->json([
             'invoice' => $invoice->load(['shippingCompany', 'fees']),
             'invoice_data' => $invoiceData,
+            'total_to_pay' => $totalToPay,
         ]);
     }
 

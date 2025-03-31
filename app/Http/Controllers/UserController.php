@@ -110,7 +110,7 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Ces informations d\'identification ne correspondent pas à nos enregistrements.'
-            ], 401);
+            ], 422);
         }
 
         // Vérifier si l'email est vérifié
