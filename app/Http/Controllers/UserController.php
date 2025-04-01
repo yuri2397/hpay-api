@@ -123,7 +123,7 @@ class UserController extends Controller
                 'message' => 'Veuillez vérifier votre adresse email avant de vous connecter.',
                 'requires_verification' => true,
                 'verification_url' => $verificationUrl // En développement seulement, à supprimer en production
-            ], 403);
+            ], 422);
         }
 
         // Créer un nouveau token
